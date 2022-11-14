@@ -1,12 +1,12 @@
 class Embeddings:
-  def __init__(self, pictures):
+  def __init__(self, picture_paths):
     """ TBD """
-    self.pictures = pictures
+    self.picture_paths = picture_paths
     pass
 
    def main(self):
       embeddings = []
-      for pic in self.pictures:
+      for pic in self.picture_paths:
         pass # returnb collection of ace/body embeddings
       return embeddings
       
@@ -29,3 +29,8 @@ class Embeddings:
       pass # TBD
     
     
+##############################
+# e = Embeddings(["/content/1.jpg", "/content/2.jpg", "/content/3.jpg"])
+# # 1.jpg -> [1, 1]
+# # 2.jpg -> [2, 2]
+# assert(e.main(), [[1,1], [2,2]])
