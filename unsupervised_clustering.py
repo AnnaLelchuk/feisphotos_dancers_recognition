@@ -1,14 +1,12 @@
 import matplotlib.pyplot as plt
 import matplotlib.cbook as cbook
 import numpy as np
-from numpy import asarray
 from scipy.spatial.distance import cosine
 import pandas as pd
 import os
 import pickle
 import itertools
 from sklearn.cluster import DBSCAN
-from collections import Counter
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from collections import Counter
@@ -18,12 +16,11 @@ class UnsupervisedClustering():
     implemented_dim_reduction_methods = [PCA]
     implemented_clustering_methods = [DBSCAN]
 
-    def __init__(self, dict_list, clustering_params, dim_reduction_method=PCA, clustering_method=DBSCAN,
-                 scale_again=True, scale_again_type=StandardScaler()):
+    def __init__(self, dict_list, dim_reduction_method=PCA, clustering_method=DBSCAN, scale_again=True,
+                 scale_again_type=StandardScaler()):
         """ Initializes an instance of the class """
 
         self.dict_list = dict_list
-        self.clustering_params = clustering_params
         self.dim_reduction_method = dim_reduction_method
         self.clustering_method = clustering_method
         self.scale_again = scale_again
@@ -31,6 +28,7 @@ class UnsupervisedClustering():
         self.dim_reduction_array = None
         self.applied_dim_reduction = False
         self.clusters = None
+        self.concat_array = None
 
     def apply_dim_reduction(self):
         """ Applies dimensionality reduction to each dictionary in the list of dictionaries.
@@ -42,8 +40,18 @@ class UnsupervisedClustering():
             'scale_type':StandardScaler()}
         """
 
+        # raises error if dimensionality reduction method does not exist
         if self.dim_reduction_method not in self.implemented_dim_reduction_methods:
             raise NotImplementedError
+
+        # if dimensionality reduction method is None return the concated array:
+        if self.dim_reduction_method is None:
+            for dict_ in self.dict_list:
+                if self.concat_array is None:
+                    self.concat_array = dict_['array']
+                else:
+                    self.concat_array = np.concatenate((self.concat_array, dict_['array']), axis=1)
+            return self
 
         # iterates over list of dictionaries, and apply scaling and PCA according to what is specified in each dictionary
         for dict_ in self.dict_list:
@@ -79,34 +87,51 @@ class UnsupervisedClustering():
     def explain_dim_reduction(self, fig_size=(15, 10)):
         """ Plots the explanation of the dimensionality reduction method """
 
+        # raises error if dimensionality reduction method does not exist
         if self.dim_reduction_method not in self.implemented_dim_reduction_methods:
             raise NotImplementedError
 
+        # gets total number of components (combined from the inserted arrays)
         num_components = sum([i['num_components'] for i in self.dict_list])
 
-        pca = self.dim_reduction_method(num_components)
-        pca.fit(self.dim_reduction_array)
+        # applies and fits dimensionality reduction method
+        dim_reduction = self.dim_reduction_method(num_components)
+        dim_reduction.fit(self.dim_reduction_array)
 
+        # plots the graph with variance per component and acumulated
         plt.figure(figsize=fig_size)
         x_range = np.arange(1, num_components + 1)
-        plt.plot(x_range, pca.explained_variance_ratio_)
+        plt.plot(x_range, dim_reduction.explained_variance_ratio_)
         plt.xlabel('# principal components')
         plt.ylabel('Variance explained by component', color='C0')
         plt.twinx()
 
-        plt.plot(x_range, pca.explained_variance_ratio_.cumsum(), color='C1')
+        plt.plot(x_range, dim_reduction.explained_variance_ratio_.cumsum(), color='C1')
         plt.ylabel('Cumulative variance explained', color='C1')
         plt.show()
 
     def apply_clustering(self, cluster_params):
+        """ Applies the clustering method to the array extracted using dimensionality reduction"""
+
+        # raises error if clustering method does not exist
         if self.clustering_method not in self.implemented_clustering_methods:
             raise NotImplementedError
 
-        self.clusters = DBSCAN(eps=cluster_params['eps'],
-                               min_samples=cluster_params['min_samples'],
-                               metric=cluster_params['metric'],
-                               leaf_size=cluster_params['leaf_size']). \
-            fit(self.dim_reduction_array)
+        # checks whether dimensionality reduction was applied (to decide if we'll use
+        # self.dim_reduction_array or just self.concat_array)
+
+        if self.applied_dim_reduction:
+            clustering_array = self.dim_reduction_array
+        else:
+            clustering_array = self.concat_array
+
+        # Logic for DBSCAN clustering
+        if self.clustering_method == DBSCAN:
+            self.clusters = self.clustering_method(eps=cluster_params['eps'],
+                                                   min_samples=cluster_params['min_samples'],
+                                                   metric=cluster_params['metric'],
+                                                   leaf_size=cluster_params['leaf_size']). \
+                fit(clustering_array)
         return self
 
     def plot_scatter(self, label_type, labels=None, fig_size=(15, 10), display_outliers=True,
@@ -115,14 +140,18 @@ class UnsupervisedClustering():
         possible labels types: 'clusters' or 'true_labels'. The values should
         be provided
         """
-
+        # raises error if dimensionality reduction method does not exist
         if self.dim_reduction_method not in self.implemented_dim_reduction_methods:
             raise NotImplementedError
 
+        # raises error if clustering method does not exist
         if self.clustering_method not in self.implemented_clustering_methods:
             raise NotImplementedError
 
-        labels_ = sorted(Counter(self.clusters.labels_).items())
+        # extract labels from cluster
+        labels_ = sorted(Counter(labels).items())
+
+        # gets total number of components
         num_components = sum([i['num_components'] for i in self.dict_list])
 
         # removes outlier (label=-1) from plot
@@ -140,12 +169,13 @@ class UnsupervisedClustering():
             array_1 = self.dict_list[0]['pca_array']
             array_2 = self.dict_list[1]['pca_array']
 
+        # plot the chart with colors per cluster/ true label according to input
         plt.figure(figsize=fig_size)
         for values in labels_:
             label = values[0]
             plt.scatter(array_1[labels == label, 0],
                         array_2[labels == label, 1],
-                        label=f'Cluster {label}')
+                        label=f'{label_type} {label}')
 
         plt.xlabel('Component 0')
         plt.ylabel('Component 1')
@@ -158,17 +188,27 @@ class UnsupervisedClustering():
         containing the outliers that the cluster identified, but coloured with their true labels
         """
 
+        # raises error if dimensionality reduction method does not exist
         if self.dim_reduction_method not in self.implemented_dim_reduction_methods:
             raise NotImplementedError
 
+        # raises error if clustering method does not exist
         if self.clustering_method not in self.implemented_clustering_methods:
             raise NotImplementedError
 
+        # extract labels from cluster
         labels = self.clusters.labels_
         labels_ = sorted(Counter(labels).items())
+
+        # gets true label where the clustering labels are outliers
         true_labels_ = np.array(true_labels_)[[labels == outlier_label]]
+
+        # gets total number of components
         num_components = sum([i['num_components'] for i in self.dict_list])
 
+        # if there is only one array, uses first 2 components from the array
+        # else it takes the first components of the array in the first dict
+        # and the first component of the array in the second dict
         if len(self.dict_list) == 1:
             array_1 = self.dict_list[0]['pca_array'][labels == outlier_label, 0]
             array_2 = self.dict_list[0]['pca_array'][labels == outlier_label, 1]
@@ -187,4 +227,3 @@ class UnsupervisedClustering():
         plt.legend()
         plt.title(f'Outlier points clustered with DBScan and PCA (k: {num_components}), colored by true label')
         plt.show()
-
