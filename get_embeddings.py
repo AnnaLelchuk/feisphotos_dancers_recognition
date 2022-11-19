@@ -23,6 +23,15 @@ from keras.models import Model
 from tensorflow.keras.applications.vgg16 import preprocess_input, decode_predictions
 
 class Embeddings:
+    """Gets embeddings in the following way:
+    1. Receives a path where all the photos are
+    2. Creates a list of pathes to each of the photos and converts them to np array
+    3. Crops body from each photo (with Yolo) and saves that array
+    4. Crops face from each detected body (with MTCNN) and saves that array
+    5. Gets face embedding from cropped face with VGGFace
+    6. Gets body embedding from cropped body with VGG-16
+    Returns: self.body_arrays, self.face_arrays, self.face_emb, self.body_emb
+    """
     def __init__(self, source_path):
         """ Initiated with path to all the photos that need to be sorted"""
         photo_names = os.listdir(source_path)
