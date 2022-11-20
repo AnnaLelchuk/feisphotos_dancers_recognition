@@ -1,7 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
-from mtcnn.mtcnn import MTCNN
+# from mtcnn.mtcnn import MTCNN
+# pip install mtcnn-opencv
+from mtcnn_cv2 import MTCNN
 from numpy import asarray
 from PIL import Image
 from keras_vggface.vggface import VGGFace
@@ -56,14 +58,14 @@ class Embeddings:
         # get face embedding
         vggface_model = VGGFace(model='resnet50', include_top=False, input_shape=(224, 224, 3), pooling='avg')
         print('\nGetting face embeddings')
-        self.face_emb = [self.get_face_embedding([f], vggface_model) if f is not None else None for f in tqdm(self.face_arrays)]
+        self.face_emb = [self.get_face_embedding([f], vggface_model) if f is not None else None for f in self.face_arrays]
 
         # get body embeddings
         # load model and remove the output layer
         print('\nGetting body embeddings')
         vgg_model = VGG16()
         vgg_model = Model(inputs=vgg_model.inputs, outputs=vgg_model.layers[-2].output)
-        self.body_emb = [self.get_body_embedding_vgg16([b][0], vgg_model) if b is not None else None for b in tqdm(self.body_arrays)]
+        self.body_emb = [self.get_body_embedding_vgg16([b][0], vgg_model) if b is not None else None for b in self.body_arrays]
 
         return self.body_arrays, self.face_arrays, self.face_emb, self.body_emb
 

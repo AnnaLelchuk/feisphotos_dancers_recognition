@@ -89,7 +89,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <module name="" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main.py" />
-      <option name="PARAMETERS" value="-s &quot;C:\Users\lelchuk\Desktop\ITC_course\810.Project_2\0.git_repo\feisphotos_dancers_recognition\test_folder&quot; -t &quot;C:\Users\lelchuk\Desktop\ITC_course\810.Project_2\0.git_repo\feisphotos_dancers_recognition\test_folder\target&quot;" />
+      <option name="PARAMETERS" value="-s &quot;C:\Users\lelchuk\Desktop\0.Showcase&quot; -t &quot;C:\Users\lelchuk\Desktop\0.Showcase\target&quot;" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />

@@ -3,6 +3,7 @@ from unsupervised_clustering import UnsupervisedClustering
 import numpy as np
 from scipy.spatial.distance import cosine
 from scipy.spatial.distance import euclidean
+from unsupervised_clustering import face_clustering
 
 """
 Adds remaining photos to existing clusters
@@ -65,16 +66,25 @@ def cluster_outliers(clusters_dict):
     # For each outlier choosing closest cluster by min eucledian distance to cluster centroid
     """
     outliers_clustered = {}
-    for i in clusters_dict[-1]['orig_ids']:
-        min_distance = np.inf
-        for cluster in clusters_dict.keys():
-            if clusters_dict[cluster]['body_emb_centroid'] is not None:
-                # cos_d = cosine(body_emb[i], clusters_dict[cluster]['body_emb_centroid'])
-                euc_d = euclidean(body_emb[i], clusters_dict[cluster]['body_emb_centroid'])
-                if euc_d < min_distance:
-                    closest_cluster = cluster
-                    min_distance = euc_d
-        outliers_clustered[i] = closest_cluster
+    # check if not only outliers were predicted
+    if (clusters_dict.keys()) != [-1]:
+        for i in clusters_dict[-1]['orig_ids']:
+            min_distance = np.inf
+
+            # go thru every cluster already in place (other than -1)
+            for cluster in clusters_dict.keys():
+                if clusters_dict[cluster]['body_emb_centroid'] is not None:
+                    # cos_d = cosine(body_emb[i], clusters_dict[cluster]['body_emb_centroid'])
+                    # calculate eucl distance from current outlier to mean body embedding for that cluster
+                    euc_d = euclidean(body_emb[i], clusters_dict[cluster]['body_emb_centroid'])
+                    if euc_d < min_distance:
+                        closest_cluster = cluster
+                        min_distance = euc_d
+                    outliers_clustered[i] = closest_cluster
+    else:
+        # if no other clusters were predicted, they are all assigned to cluster 0
+        outliers_clustered = {k: 0 for k in list(clusters_dict[-1]['orig_ids'])}
+
 
     return outliers_clustered
 
@@ -86,20 +96,23 @@ def get_final_clusters(source_path):
 
     # TODO get labels from clustering on faces
     face_emb_cleaned = np.array([emb[0] for emb in face_emb if emb is not None]) # cluster only for detected faces
-    # pred_labels = face_clustering(face_emb_cleaned)
+    face_clusters = face_clustering(embeddings_list=face_emb_cleaned, num_components=4)
+    pred_labels = face_clusters.main()
+    # print(pred_labels)
+
     # TODO to be replaced with actual clustering code!
-    TEST_LABELS_PRED = np.random.randint(int(len(face_emb_cleaned)/2), size=len(face_emb_cleaned))
+    # TEST_LABELS_PRED = np.random.randint(int(len(face_emb_cleaned)/2), size=len(face_emb_cleaned))
     
-    pred_labels = TEST_LABELS_PRED
+    # pred_labels = TEST_LABELS_PRED
     clustering_idx_dict = create_clustering_idx_dict(face_arrays, pred_labels)
     clusters_dict = create_clusters_dict(face_arrays, clustering_idx_dict)
     clusters_dict = add_body_centroids(clusters_dict, body_emb)
 
-    # if outliers were deteced, assign them to existing clusters
+    # if outliers were detected, assign them to existing clusters
     if -1 in list(clusters_dict.keys()):
         outliers_clustered = cluster_outliers(clusters_dict)
 
-        # add clustered outliers to clusteres dict
+        # add clustered outliers to clusters dict
         for item in outliers_clustered.items():
           clusters_dict[item[1]]['orig_ids'].append(item[0])
 

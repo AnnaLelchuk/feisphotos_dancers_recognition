@@ -23,6 +23,7 @@ def parse_cli():
     return source_dir, target_dir
 
 def main():
+    print('[INITIALIZING...]')
     source_dir, target_dir = parse_cli()
     img_paths, final_clusters = get_final_clusters(source_dir)
 
