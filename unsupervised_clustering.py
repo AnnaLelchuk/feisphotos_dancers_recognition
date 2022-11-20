@@ -11,10 +11,11 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from collections import Counter
 from cluster_metrics import clustering_metrics
+import umap.umap_ as umap
 
 
-class UnsupervisedClustering():
-    implemented_dim_reduction_methods = [PCA]
+class UnsupervisedClustering:
+    implemented_dim_reduction_methods = [PCA, umap.UMAP]
     implemented_clustering_methods = [DBSCAN]
 
     def __init__(self, dict_list, dim_reduction_method=PCA, clustering_method=DBSCAN, scale_again=True,
@@ -54,7 +55,7 @@ class UnsupervisedClustering():
                     self.concat_array = np.concatenate((self.concat_array, dict_['array']), axis=1)
             return self
 
-        # iterates over list of dictionaries, and apply scaling and PCA according to what is specified in each dictionary
+        # iterates over list of dictionaries, and apply scaling and Dimensionality Reduction according to what is specified in each dictionary
         for dict_ in self.dict_list:
             # multiply array by their constants
             dict_['array'] = dict_['array'] * dict_['constant']
@@ -66,21 +67,21 @@ class UnsupervisedClustering():
                 dict_['scaled_array'] = dict_['scale_type'].fit_transform(dict_['array'])
 
             # runs pca and add the created array to the dictionary
-            pca = self.dim_reduction_method(n_components=dict_['num_components'])
-            dict_['pca_array'] = pca.fit_transform(dict_['scaled_array'])
+            dim_red = self.dim_reduction_method(n_components=dict_['num_components'])
+            dict_['dim_red_array'] = dim_red.fit_transform(dict_['scaled_array'])
 
             # creates the main PCA array which is the concatenation of all the previous arrays
             # add to pca_array
             if self.dim_reduction_array is None:
-                self.dim_reduction_array = dict_['pca_array']
+                self.dim_reduction_array = dict_['dim_red_array']
             else:
-                self.dim_reduction_array = np.concatenate((self.dim_reduction_array, dict_['pca_array']), axis=1)
+                self.dim_reduction_array = np.concatenate((self.dim_reduction_array, dict_['dim_red_array']), axis=1)
 
         # if specified, scales again
         if self.scale_again:
             self.dim_reduction_array = self.scale_again_type.fit_transform(self.dim_reduction_array)
 
-        # turns to the indication if PCA was finished
+        # turns to the indication if Dimensionality Reduction was finished
         self.applied_dim_reduction = True
 
         return self
@@ -164,11 +165,11 @@ class UnsupervisedClustering():
 
         # assings values to arrays
         if len(self.dict_list) == 1:
-            array_1 = self.dict_list[0]['pca_array']
-            array_2 = self.dict_list[0]['pca_array']
+            array_1 = self.dict_list[0]['dim_red_array']
+            array_2 = self.dict_list[0]['dim_red_array']
         else:
-            array_1 = self.dict_list[0]['pca_array']
-            array_2 = self.dict_list[1]['pca_array']
+            array_1 = self.dict_list[0]['dim_red_array']
+            array_2 = self.dict_list[1]['dim_red_array']
 
         # plot the chart with colors per cluster/ true label according to input
         plt.figure(figsize=fig_size)
@@ -211,11 +212,11 @@ class UnsupervisedClustering():
         # else it takes the first components of the array in the first dict
         # and the first component of the array in the second dict
         if len(self.dict_list) == 1:
-            array_1 = self.dict_list[0]['pca_array'][labels == outlier_label, 0]
-            array_2 = self.dict_list[0]['pca_array'][labels == outlier_label, 1]
+            array_1 = self.dict_list[0]['dim_red_array'][labels == outlier_label, 0]
+            array_2 = self.dict_list[0]['dim_red_array'][labels == outlier_label, 1]
         else:
-            array_1 = self.dict_list[0]['pca_array'][labels == outlier_label, 0]
-            array_2 = self.dict_list[1]['pca_array'][labels == outlier_label, 0]
+            array_1 = self.dict_list[0]['dim_red_array'][labels == outlier_label, 0]
+            array_2 = self.dict_list[1]['dim_red_array'][labels == outlier_label, 0]
 
         plt.figure(figsize=fig_size)
         for true_label_ in set(true_labels_):
@@ -231,12 +232,15 @@ class UnsupervisedClustering():
 
 
 class UnsupervisedGridSearch:
-    def __init__(self, dict_list, clustering_params, true_labels, chosen_metric='AMI'):
+    def __init__(self, dict_list, clustering_params, true_labels, chosen_metric='AMI', dim_reduction_method=PCA,
+                 clustering_method=DBSCAN):
         """ Initializes an instance of the class """
         self.dict_list = dict_list
         self.clustering_params = clustering_params
         self.true_labels = true_labels
         self.chosen_metric = chosen_metric
+        self.dim_reduction_method = dim_reduction_method
+        self.clustering_method = clustering_method
         self._best_dim_red_combination = None
         self._best_cluster_combination = None
         self.best_combination = None
@@ -310,7 +314,9 @@ class UnsupervisedGridSearch:
         idx_list = []
         # iterate over the dim reduction combinations
         for dim_reduction_idx, dim_reduction_params in enumerate(self.dim_reduction_combinations):
-            self.uc = UnsupervisedClustering(dict_list=dim_reduction_params)
+            self.uc = UnsupervisedClustering(dict_list=dim_reduction_params,
+                                             dim_reduction_method=self.dim_reduction_method,
+                                             clustering_method=self.clustering_method)
             self.uc.apply_dim_reduction()
 
             # build results_dict
@@ -351,7 +357,9 @@ class UnsupervisedGridSearch:
 
     def _run_best_metric(self):
         """ runs for the combination that returns the best metric"""
-        self.uc = UnsupervisedClustering(dict_list=self._best_dim_red_combination)
+        self.uc = UnsupervisedClustering(dict_list=self._best_dim_red_combination,
+                                         dim_reduction_method=self.dim_reduction_method,
+                                         clustering_method=self.clustering_method)
         self.uc.apply_dim_reduction()
         self.uc.apply_clustering(self._best_cluster_combination)
         self._best_metric = clustering_metrics(self.true_labels, self.uc.clusters.labels_)
@@ -360,8 +368,8 @@ class UnsupervisedGridSearch:
 
 class face_clustering():
 
-    def __init__(self, embeddings_list, constant=1, num_components=150, is_scaled=False, scale_type=StandardScaler(),
-                 dim_reduction_method=PCA, clustering_method=DBSCAN, scale_again=True,
+    def __init__(self, embeddings_list, constant=1, num_components=5, is_scaled=False, scale_type=StandardScaler(),
+                 dim_reduction_method=umap.UMAP, clustering_method=DBSCAN, scale_again=True,
                  scale_again_type=StandardScaler()):
         """ Initializes an instance of the class """
         self.embeddings_list = embeddings_list
@@ -380,7 +388,7 @@ class face_clustering():
                            'is_scaled': is_scaled,
                            'scale_type': scale_type}]
 
-    def main(self, cluster_params={'eps': 0.5, 'min_samples': 5, 'metric': 'cosine', 'leaf_size': 5}):
+    def main(self, cluster_params={'eps': 0.01, 'min_samples': 4, 'metric': 'cosine', 'leaf_size': 4}):
         """ runs UnsupervisedClustering with the parameters for face embeddings. Returns the an array with the labeled clusters (UnsupervisedClustering.clusters.labels_)"""
 
         self.uc = UnsupervisedClustering(self.dict_list,
