@@ -5,10 +5,11 @@ from scipy.spatial.distance import cosine
 from scipy.spatial.distance import euclidean
 
 """
-Puts everything together
+Adds remaining photos to existing clusters
 """
-TEST_PATH = r"C:/Users/lelchuk/Desktop/ITC_course/810.Project_2/Test_folder"
-TEST_LABELS_PRED = [0,0,-1,1,1]
+
+# class final_groups():
+
 
 def create_clustering_idx_dict(face_arrays, pred_labels):
     """
@@ -77,36 +78,43 @@ def cluster_outliers(clusters_dict):
 
     return outliers_clustered
 
-
-
-if __name__ == '__main__':
+def get_final_clusters(source_path):
     # get face and body embeddings of the source folder images
-    my_emb = Embeddings(TEST_PATH)
+    my_emb = Embeddings(source_path)
     body_arrays, face_arrays, face_emb, body_emb = my_emb.main()
     # print(len(body))
 
-    # get labels from clustering on faces
+    # TODO get labels from clustering on faces
     face_emb_cleaned = np.array([emb[0] for emb in face_emb if emb is not None]) # cluster only for detected faces
-    # pred_labels = perform_face_clustering(face_emb_cleaned)
+    # pred_labels = face_clustering(face_emb_cleaned)
     # TODO to be replaced with actual clustering code!
+    TEST_LABELS_PRED = np.random.randint(int(len(face_emb_cleaned)/2), size=len(face_emb_cleaned))
+    
     pred_labels = TEST_LABELS_PRED
     clustering_idx_dict = create_clustering_idx_dict(face_arrays, pred_labels)
     clusters_dict = create_clusters_dict(face_arrays, clustering_idx_dict)
     clusters_dict = add_body_centroids(clusters_dict, body_emb)
-    outliers_clustered = cluster_outliers(clusters_dict)
 
-    # add clustered outliers to clusteres dict
-    for item in outliers_clustered.items():
-      clusters_dict[item[1]]['orig_ids'].append(item[0])
+    # if outliers were deteced, assign them to existing clusters
+    if -1 in list(clusters_dict.keys()):
+        outliers_clustered = cluster_outliers(clusters_dict)
 
-    del clusters_dict[-1]
+        # add clustered outliers to clusteres dict
+        for item in outliers_clustered.items():
+          clusters_dict[item[1]]['orig_ids'].append(item[0])
+
+        del clusters_dict[-1]
+
     final_clusters = np.empty(len(body_arrays))
 
-    # ???
+    # add
     for cluster in clusters_dict.keys():
         final_clusters[clusters_dict[cluster]['orig_ids']] = cluster
     final_clusters = final_clusters.astype(int)
-    print(final_clusters)
+    return my_emb.img_paths, final_clusters
+
+
+
 
 
 
