@@ -227,3 +227,131 @@ class UnsupervisedClustering():
         plt.legend()
         plt.title(f'Outlier points clustered with DBScan and PCA (k: {num_components}), colored by true label')
         plt.show()
+
+
+class UnsupervisedGridSearch:
+    def __init__(self, dict_list, clustering_params, true_labels, chosen_metric='AMI'):
+        """ Initializes an instance of the class """
+        self.dict_list = dict_list
+        self.clustering_params = clustering_params
+        self.true_labels = true_labels
+        self.chosen_metric = chosen_metric
+        self._best_dim_red_combination = None
+        self._best_cluster_combination = None
+        self.best_combination = None
+        self._best_metric = None
+        self.grid_search_results = []
+        self.clustering_combinations = []
+        self.dim_reduction_combinations = []
+
+    def _create_clustering_combinations(self):
+        """ Given a dictionary in the format clustering_params = {'eps_values_list': [...], 'min_samples_values_list': [...], 'metrics_values_list': [...], 'leaf_size_values_list':  [...]}
+        creates a list with dictionaries with all the possible combinations of parameters """
+
+        clustering_hyperparams_list = [i for i in self.clustering_params.values()]
+        clustering_combinations_list = list(itertools.product(*clustering_hyperparams_list))
+
+        for clustering_combination in clustering_combinations_list:
+            eps, min_samples, metric, leaf_size = clustering_combination
+            dict_ = {'eps': eps, 'min_samples': min_samples, 'metric': metric, 'leaf_size': leaf_size}
+            self.clustering_combinations.append(dict_)
+
+        return self
+
+    def _create_dim_reduction_combinations(self):
+        """ Given a list of dictionary with the following format  [{'array': [embedding_array],'constant':[...],'num_components':[...], 'is_scaled':[...], 'scale_type':[]}]
+        Creates a list of dictionaries with all the possible combinations. The list can contain multiple dictionaries.
+        The value for the key 'array' should be a numpy array, it is not a parameter for the combinations"""
+
+        combinations_list = []
+
+        for idx, value_ in enumerate(self.dict_list):
+            array_ = self.dict_list[idx]['array']
+            constant_list = self.dict_list[idx]['constant']
+            num_components_list = self.dict_list[idx]['num_components']
+            is_scaled_list = self.dict_list[idx]['is_scaled']
+            scale_type_list = self.dict_list[idx]['scale_type']
+
+            dim_reduction_hyperparams = [array_, constant_list, num_components_list, is_scaled_list, scale_type_list]
+            # creates combination
+            combinations_list.append(list(itertools.product(*dim_reduction_hyperparams)))
+
+        # transforms in list of list of dicts
+        # for now we have the combinations for each of the arrays, we need the actual combination of both
+        # is a list of tuples
+        dim_reduction_combinations_list = list(itertools.product(*combinations_list))
+
+        # transform the list of tuples into list of list of dicts
+        self.dim_reduction_combinations = []
+        for list_ in dim_reduction_combinations_list:
+            combination = []
+            for tup in list_:
+                array, constant, num_component, is_scaled, scale_type = tup
+                combination.append({'array': array,
+                                    'constant': constant,
+                                    'num_components': num_component,
+                                    'is_scaled': is_scaled,
+                                    'scale_type': scale_type})
+            self.dim_reduction_combinations.append(combination)
+
+        return self
+
+    def apply_grid_search(self):
+        """ Applies grid search with all the parameters obtained from the combinations"""
+        # create combinations
+        if len(self.clustering_combinations) == 0:
+            self._create_clustering_combinations()
+
+        if len(self.dim_reduction_combinations) == 0:
+            self._create_dim_reduction_combinations()
+
+        # list of index combinations to be able to traceback to best combination of results
+        idx_list = []
+        # iterate over the dim reduction combinations
+        for dim_reduction_idx, dim_reduction_params in enumerate(self.dim_reduction_combinations):
+            self.uc = UnsupervisedClustering(dict_list=dim_reduction_params)
+            self.uc.apply_dim_reduction()
+
+            # build results_dict
+            for cluster_idx, cluster_params in enumerate(self.clustering_combinations):
+                # apply clustering with the parameters and add to results_dict
+                self.uc.apply_clustering(cluster_params)
+                results_dict = clustering_metrics(self.true_labels, self.uc.clusters.labels_)
+
+                # add cluster info
+                for key_ in cluster_params.keys():
+                    results_dict[key_] = cluster_params[key_]
+
+                # add also information about the embeddings/ pca (constant, num_components, is_scaled_scale_type)
+                for idx, dict_ in enumerate(dim_reduction_params, 1):
+                    results_dict[f'constant_{idx}'] = dict_['constant']
+                    results_dict[f'num_components_{idx}'] = dict_['num_components']
+                    results_dict[f'is_scaled_{idx}'] = dict_['is_scaled']
+                    results_dict[f'scale_type_{idx}'] = dict_['scale_type']
+
+                # adds the dict to the list of results
+                self.grid_search_results.append(results_dict)
+                idx_list.append((dim_reduction_idx, cluster_idx))
+
+        # gets best metric in user friendly format
+        idx_best_metric = \
+        pd.DataFrame(self.grid_search_results).sort_values(by=[self.chosen_metric], ascending=False).index[0]
+        self.best_combination = self.grid_search_results[idx_best_metric]
+
+        # traceback to best dim_reduction and cluster params
+        best_dim_reduction_idx, best_cluster_idx = idx_list[idx_best_metric]
+        self._best_dim_red_combination = self.dim_reduction_combinations[best_dim_reduction_idx]
+        self._best_cluster_combination = self.clustering_combinations[best_cluster_idx]
+
+        # runs best combination
+        self._run_best_metric()
+
+        return self
+
+    def _run_best_metric(self):
+        """ runs for the combination that returns the best metric"""
+        self.uc = UnsupervisedClustering(dict_list=self._best_dim_red_combination)
+        self.uc.apply_dim_reduction()
+        self.uc.apply_clustering(self._best_cluster_combination)
+        self._best_metric = clustering_metrics(self.true_labels, self.uc.clusters.labels_)
+        return self
