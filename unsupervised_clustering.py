@@ -10,6 +10,7 @@ from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from collections import Counter
+from cluster_metrics import clustering_metrics
 
 
 class UnsupervisedClustering():
