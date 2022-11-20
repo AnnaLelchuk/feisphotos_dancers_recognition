@@ -341,7 +341,7 @@ class UnsupervisedGridSearch:
         # traceback to best dim_reduction and cluster params
         best_dim_reduction_idx, best_cluster_idx = idx_list[idx_best_metric]
         self._best_dim_red_combination = self.dim_reduction_combinations[best_dim_reduction_idx]
-        self._best_cluster_combination = self.clustering_combinations[best_dim_reduction_idx]
+        self._best_cluster_combination = self.clustering_combinations[best_cluster_idx]
 
         # runs best combination
         self._run_best_metric()

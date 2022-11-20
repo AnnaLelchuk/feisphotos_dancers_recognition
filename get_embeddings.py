@@ -5,180 +5,180 @@ from mtcnn.mtcnn import MTCNN
 from numpy import asarray
 from PIL import Image
 from keras_vggface.vggface import VGGFace
-from keras_vggface.utils import preprocess_input
+# from keras_vggface.utils import preprocess_input
+from keras_vggface import utils
 import conf as CFG
+import os
 from keras_vggface.utils import decode_predictions
+from tqdm import tqdm
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# import tensorflow as tf
+# for loading/processing the images
+from keras.utils import load_img, img_to_array
+from keras.applications.vgg16 import preprocess_input
+
+# models vg16
+from keras.applications.vgg16 import VGG16
+from keras.models import Model
+from tensorflow.keras.applications.vgg16 import preprocess_input, decode_predictions
 
 class Embeddings:
-    def __init__(self, pic_path):
-        """ Receives a pic path to initialize, reads to np.array, rotates 90deg counterclockwise.
-        Returns np.array of the pic """
-        img = plt.imread(pic_path)
-        img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
-        self.img = img
+    """Gets embeddings in the following way:
+    1. Receives a path where all the photos are
+    2. Creates a list of pathes to each of the photos and converts them to np array
+    3. Crops body from each photo (with Yolo) and saves that array
+    4. Crops face from each detected body (with MTCNN) and saves that array
+    5. Gets face embedding from cropped face with VGGFace
+    6. Gets body embedding from cropped body with VGG-16
+    Returns: self.body_arrays, self.face_arrays, self.face_emb, self.body_emb
+    """
+    def __init__(self, source_path):
+        """ Initiated with path to all the photos that need to be sorted"""
+        photo_names = os.listdir(source_path)
+        self.img_paths = [source_path + '/' + photo for photo in photo_names]
+        self.img_arrays = [cv2.rotate(plt.imread(path), cv2.ROTATE_90_COUNTERCLOCKWISE) for path in self.img_paths]
+        # true_labels = [photo[:3] for photo in photo_names]
 
     def main(self):
-        # get face array
-        # self.face_array = self.crop_face(self.img)
-        self.get_face_array()
-        self.face_emb = self.get_face_embedding([self.face_array])
+        # configuring the yolo_net:
+        yolo_model = cv2.dnn.readNetFromDarknet(CFG.YOLO_CFG, CFG.YOLO_WEIGHTS)
+        yolo_model.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+        # crop the person from the original photos
+        print('\nDetecting dancer from images')
+        self.body_arrays = [self.crop_person(img, yolo_model) for img in tqdm(self.img_arrays)]
 
-        # get body array
-        # self.net = self.configure_yolo()
-        # self.body_array = self.crop_body()
-        self.get_body_array()
-        self.body_emb = self.get_body_embedding(self.body_array)
-        return [self.face_emb, self.body_emb]
-
-    def get_face_array(self):
-        self.face_array = self.crop_face(self.img)
-        self.face_emb = self.get_face_embedding([self.face_array])
-        return self.face_array
-
-    def get_body_array(self):
-        self.net = self.configure_yolo()
-        self.body_array = self.crop_body()
-        return self.body_array
-
-    def crop_face(self, img, required_size=(224, 224)):
-        """
-        Uses MTCNN to detect face from a photo.
-        Returns cropped face
-        """
+        # configure MTCNN
         detector = MTCNN()
-        # detect faces in the image
-        results = detector.detect_faces(self.img)
+        # crop the person from the person
+        print('\nDetecting faces from images')
+        self.face_arrays = [self.crop_face(b, detector) if b is not None else None for b in tqdm(self.body_arrays)]
 
-        # extract the bounding box from the first face
-        x1, y1, width, height = results[0]['box']
-        x2, y2 = x1 + width, y1 + height
-        # extract the face
-        face = img[y1:y2, x1:x2]
+        # get face embedding
+        vggface_model = VGGFace(model='resnet50', include_top=False, input_shape=(224, 224, 3), pooling='avg')
+        print('\nGetting face embeddings')
+        self.face_emb = [self.get_face_embedding([f], vggface_model) if f is not None else None for f in tqdm(self.face_arrays)]
 
-        # resize pixels to the model size
-        image = Image.fromarray(face)
-        image = image.resize(required_size)
-        self.face_array = asarray(image)
+        # get body embeddings
+        # load model and remove the output layer
+        print('\nGetting body embeddings')
+        vgg_model = VGG16()
+        vgg_model = Model(inputs=vgg_model.inputs, outputs=vgg_model.layers[-2].output)
+        self.body_emb = [self.get_body_embedding_vgg16([b][0], vgg_model) if b is not None else None for b in tqdm(self.body_arrays)]
 
-        return self.face_array
-
-    def get_face_embedding(self, face_array):
-        """ return VGGFace representation """
-        '''Calculates face embeddings for a list of photo files'''
-        # convert into an array of samples
-        face_array = asarray(face_array, 'float32')
-        # prepare the face for the model, e.g. center pixels
-        face_array = preprocess_input(face_array, version=2)
-        # create a vggface model
-        model = VGGFace(model='resnet50', include_top=False, input_shape=(224, 224, 3), pooling='avg')
-        # create embedding
-        self.face_emb = model.predict(face_array)
-        return self.face_emb
-
-    def crop_body(self, required_size=(224, 224)):
-        """
-        Uses Yolo to detect a person. Crops upper body from the person.
-        Returns cropped upper body as a numpy array.
-        """
-        box, confidence = self.detect_person()
-        if len(box) != 0:
-            x = box[0]
-            y = box[1]
-            w = box[2]
-            h = box[3]
-
-            # extract person from a photo
-            person = self.img[y:y + h, x:x + w]
-
-            # crop upper body based on avg body and legs percentage of a person, resize to VGG size
-            self.upper_body = person[round(person.shape[0] * CFG.HEAD_PERC): round(person.shape[0] * (1 - CFG.LEGS_PERC)), :]
-            self.upper_body = cv2.resize(self.upper_body, required_size)
-
-        return self.upper_body
+        return self.body_arrays, self.face_arrays, self.face_emb, self.body_emb
 
 
 
     def output_coordinates_to_box_coordinates(self, cx, cy, w, h, img_w, img_h):
-        """Utility function for Yolo body detection"""
+        """Utility function for body detection"""
         abs_x = int((cx - w / 2) * img_w)
         abs_y = int((cy - h / 2) * img_h)
         abs_w = int(w * img_w)
         abs_h = int(h * img_h)
         return abs_x, abs_y, abs_w, abs_h
 
-    def detect_person(self, conf_thresh=.5, nms_thresh=.4):
-        """"""
-        img_h, img_w = self.img.shape[:2]
+    def crop_person(self, img, net, conf_thresh=.05, nms_thresh=.4):
+        """Crops a person out pf the photo.
+        Returns np array"""
+        img_h, img_w = img.shape[:2]
 
         # getting a blob
-        blob = cv2.dnn.blobFromImage(self.img, 1 / 255, (416, 416), swapRB=True, crop=False)
-        self.net.setInput(blob)
+        blob = cv2.dnn.blobFromImage(img, 1 / 255, (416, 416), swapRB=True, crop=False)
+        net.setInput(blob)
 
         # getting predictions
-        output_names = list(self.net.getUnconnectedOutLayersNames())[-3:]
-        large, medium, small = self.net.forward(output_names)
-        all_outputs = np.vstack((large, medium, small))  # all the pedictions
-        objs = all_outputs[all_outputs[:, 4] >= conf_thresh]  # filtering just those with higher confidence and persons only
-        objs = objs[np.any(objs[:, 5:] == 0, axis=1)]
+        output_names = list(net.getUnconnectedOutLayersNames())[-3:]
+        large, medium, small = net.forward(output_names)
+        all_outputs = np.vstack((large, medium, small))  # all the predictions
+        objs = all_outputs[all_outputs[:, 4] >= .05]  # filtering just those with higher confidence
 
-        # getting boxes
+        #  getting boxes and confidences
         boxes = []
         for row in objs:
             cx, cy, w, h = row[:4]
             x_value, y_value, width, height = self.output_coordinates_to_box_coordinates(cx, cy, w, h, img_w, img_h)
             boxes.append([x_value, y_value, width, height])
-
         confidences = list(map(float, objs[:, 4]))
 
         # applying NMS
         indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_thresh, nms_thresh)
+        if len(indices) >= 1:
 
-        boxes = np.array(boxes)[[indices]]
-        confidences = np.array(confidences)[[indices]]
+            boxes = np.array(boxes)[indices]
+            confidences = np.array(confidences)[indices]
 
-        # if there are several boxes, chose 'widest' (that would probably give a person in the front)
-        if len(indices) == 1:
-            self.box = boxes[0]
-            self.confidence = confidences[0]
+            # selecting one box out of all predicted
+            # remove boxes by the edges (15 pixels or less from the edge)
+            if len(boxes) > 1:
+                x = np.array([box[0] for box in boxes])
+                w = np.array([box[2] for box in boxes])
+                x_good = np.where(x > 15)
+                w_good = np.where(x + w < img.shape[1] - 15)
+                ind_choice = np.intersect1d(x_good, w_good)
+                boxes = boxes[ind_choice]
+                confidences = confidences[ind_choice]
 
-        elif len(indices) > 1:
+                # if still more than one remains, keep only with teh max height
+                if len(boxes) > 1:
+                    h = [box[3] for box in boxes]
+                    final = np.argmax(h)
+                    boxes = boxes[final].reshape(1, 4)
+                    confidences = confidences[final]
 
-            widths = np.array([box[2] for box in boxes])
-            final_idx = np.argmax(widths)
-            self.box = boxes[final_idx]
-            self.confidence = confidences[final_idx]
-        return self.box, self.confidence
+            x = boxes[0][0]
+            y = boxes[0][1]
+            w = boxes[0][2]
+            h = boxes[0][3]
 
-    def get_body_embedding(self, upper_body):
-        """ return VGG16 representation  """
-        # crop the body YOLO
-        # pass the input the face to VGG16 to get embeddings
-        # return VGGFace
+            person = img[max(y, 0): min(y + h, img.shape[0]), max(x, 0):min(x + w, img.shape[1])]
 
-        # UPDATE WITH AN ACTUAL CODE!
-        self.body_emb = np.random.randint(2, size=10)
-        return self.body_emb
+        else:
+            person = None
 
-    def configure_yolo(self):
+        return person
 
-        # configuring the net:
-        self.net = cv2.dnn.readNetFromDarknet(CFG.YOLO_CFG, CFG.YOLO_WEIGHTS)
-        self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-        return self.net
+    def crop_face(self, img_array, detector, required_size=(224, 224)):
+        face_arrays = []
+        results = detector.detect_faces(img_array)
+        if results != []:
+            # extract the bounding box from the first face
+            x1, y1, width, height = results[0]['box']
+            x2, y2 = x1 + width, y1 + height
+            # extract the face
+            face = img_array[y1:y2, x1:x2]
+            # resize pixels to the model size
+            face = Image.fromarray(face)
+            face = face.resize(required_size)
+            face_array = asarray(face)
 
-    def body_embedding_simease(self, pic):
-        """ return Simease representation  """
-        pass # TBD
-##############################
-# # API
-# # initialise the object with a path
-# emb = Embeddings(r"C:\Users\lelchuk\Desktop\ITC_course\810.Project_2\Great_Britain_Championships_2021\solo\U16_Girls\highres\110\_U164470.JPG")
-# # to get face array:
-# face_array = emb.get_face_array()
+        else:
+            face_array = None
+
+        return face_array
+
+    def get_face_embedding(self, face_arrays, model):
+        # convert into an array of samples
+        face_arrays = asarray(face_arrays, 'float32')
+        # prepare the face for the model, e.g. center pixels
+        face_arrays = utils.preprocess_input(face_arrays, version=2)
+        # create embedding
+        face_emb = model.predict(face_arrays)
+        return face_emb
+
+    def get_body_embedding_vgg16(self, body_array, model):
+        # prepare image for model
+        body_array = cv2.resize(body_array, (224, 224))
+        body_array = body_array.reshape(1, 224, 224, 3)
+        body_array = preprocess_input(body_array)
+
+        # get the feature vector
+        body_emb = model.predict(body_array, use_multiprocessing=True)
+        return body_emb
+
+
+##########################################################
+# API
+# emb = Embeddings(r"C:\Users\lelchuk\Desktop\ITC_course\810.Project_2\Test_folder")
 #
-# # to get body array:
-# face_array = emb.get_body_array()
-#
-# # to get face embedding:
-# face_emb = emb.get_face_embedding(face_array)
+# body, face, face_emb, body_emb = emb.main()
 
