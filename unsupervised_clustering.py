@@ -356,3 +356,38 @@ class UnsupervisedGridSearch:
         self.uc.apply_clustering(self._best_cluster_combination)
         self._best_metric = clustering_metrics(self.true_labels, self.uc.clusters.labels_)
         return self
+
+
+class face_clustering():
+
+    def __init__(self, embeddings_list, constant=1, num_components=150, is_scaled=False, scale_type=StandardScaler(),
+                 dim_reduction_method=PCA, clustering_method=DBSCAN, scale_again=True,
+                 scale_again_type=StandardScaler()):
+        """ Initializes an instance of the class """
+        self.embeddings_list = embeddings_list
+        self.constant = constant
+        self.num_components = num_components
+        self.is_scaled = is_scaled
+        self.scale_type = scale_type
+        self.dim_reduction_method = dim_reduction_method
+        self.clustering_method = clustering_method
+        self.scale_again = scale_again
+        self.scale_again_type = scale_again_type
+        self.uc = None
+        self.dict_list = [{'array': embeddings_list,
+                           'constant': constant,
+                           'num_components': num_components,
+                           'is_scaled': is_scaled,
+                           'scale_type': scale_type}]
+
+    def main(self, cluster_params={'eps': 0.5, 'min_samples': 5, 'metric': 'cosine', 'leaf_size': 5}):
+        """ runs UnsupervisedClustering with the parameters for face embeddings. Returns the an array with the labeled clusters (UnsupervisedClustering.clusters.labels_)"""
+
+        self.uc = UnsupervisedClustering(self.dict_list,
+                                         dim_reduction_method=self.dim_reduction_method,
+                                         clustering_method=self.clustering_method,
+                                         scale_again=self.scale_again,
+                                         scale_again_type=self.scale_again_type)
+        self.uc = self.uc.apply_dim_reduction()
+        self.uc = self.uc.apply_clustering(cluster_params)
+        return self.uc.clusters.labels_
