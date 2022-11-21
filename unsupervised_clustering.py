@@ -14,8 +14,8 @@ from cluster_metrics import clustering_metrics
 import umap.umap_ as umap
 
 
-class UnsupervisedClustering:
-    implemented_dim_reduction_methods = [PCA, umap.UMAP]
+class UnsupervisedClustering():
+    implemented_dim_reduction_methods = [None, PCA, umap.UMAP]
     implemented_clustering_methods = [DBSCAN]
 
     def __init__(self, dict_list, dim_reduction_method=PCA, clustering_method=DBSCAN, scale_again=True,
@@ -31,6 +31,9 @@ class UnsupervisedClustering:
         self.applied_dim_reduction = False
         self.clusters = None
         self.concat_array = None
+
+        self._name_clustering_method = str(clustering_method).split('.')[-1][:-2]
+        self._name_dim_reduction_method = str(dim_reduction_method).split('.')[-1][:-2]
 
     def apply_dim_reduction(self):
         """ Applies dimensionality reduction to each dictionary in the list of dictionaries.
@@ -48,11 +51,16 @@ class UnsupervisedClustering:
 
         # if dimensionality reduction method is None return the concated array:
         if self.dim_reduction_method is None:
-            for dict_ in self.dict_list:
-                if self.concat_array is None:
-                    self.concat_array = dict_['array']
-                else:
-                    self.concat_array = np.concatenate((self.concat_array, dict_['array']), axis=1)
+            # if there is only one type of embeddings
+            if len(self.dict_list) == 1:
+                self.concat_array = self.dict_list[0]['array'].copy()
+            # for multiple dicts of embeddings
+            else:
+                for dict_ in self.dict_list:
+                    if self.concat_array is None:
+                        self.concat_array = dict_['array'].copy()
+                    else:
+                        self.concat_array = np.concatenate((self.concat_array, dict_['array']), axis=1)
             return self
 
         # iterates over list of dictionaries, and apply scaling and Dimensionality Reduction according to what is specified in each dictionary
@@ -123,9 +131,9 @@ class UnsupervisedClustering:
         # self.dim_reduction_array or just self.concat_array)
 
         if self.applied_dim_reduction:
-            clustering_array = self.dim_reduction_array
+            clustering_array = self.dim_reduction_array.copy()
         else:
-            clustering_array = self.concat_array
+            clustering_array = self.concat_array.copy()
 
         # Logic for DBSCAN clustering
         if self.clustering_method == DBSCAN:
@@ -182,7 +190,8 @@ class UnsupervisedClustering:
         plt.xlabel('Component 0')
         plt.ylabel('Component 1')
         plt.legend()
-        plt.title(f'Points clustered with DBScan and PCA (k: {num_components}), colored by {label_type}')
+        plt.title(f'Points clustered with {self._name_clustering_method} ' \
+                  f'and {self._name_dim_reduction_method} (k: {num_components}), colored by {label_type}')
         plt.show()
 
     def plot_outliers_with_true_label(self, true_labels_, fig_size=(15, 10), outlier_label=-1):
@@ -227,7 +236,8 @@ class UnsupervisedClustering:
         plt.xlabel('Component 0')
         plt.ylabel('Component 1')
         plt.legend()
-        plt.title(f'Outlier points clustered with DBScan and PCA (k: {num_components}), colored by true label')
+        plt.title(f'Points clustered with {self._name_clustering_method} ' \
+                  f'and {self._name_dim_reduction_method} (k: {num_components}), colored by true label')
         plt.show()
 
 
@@ -374,10 +384,11 @@ class face_clustering():
         """ Initializes an instance of the class """
         # configuration for testing on small set (3 dancers)
         if small_set:
-            constant = 2
-            num_components = 25
+            constant = None
+            num_components = None
             is_scaled = False
             scale_type = StandardScaler()
+            dim_reduction_method = None
 
         self.embeddings_list = embeddings_list
         self.constant = constant
@@ -397,12 +408,7 @@ class face_clustering():
                            'is_scaled': is_scaled,
                            'scale_type': scale_type}]
 
-    def main(self, cluster_params={'eps': 0.01, 'min_samples': 4, 'metric': 'cosine', 'leaf_size': 4}):
-        """ runs UnsupervisedClustering with the parameters for face embeddings. Returns the an array with the labeled clusters (UnsupervisedClustering.clusters.labels_)"""
-        # configuration for testing on small set (3 dancers)
-        if self.small_set:
-            cluster_params = {'eps': 0.05, 'min_samples': 6, 'metric': 'cosine', 'leaf_size': 5}
-
+    def _run_unsupervised_cluster(self, cluster_params):
         self.uc = UnsupervisedClustering(self.dict_list,
                                          dim_reduction_method=self.dim_reduction_method,
                                          clustering_method=self.clustering_method,
@@ -410,4 +416,14 @@ class face_clustering():
                                          scale_again_type=self.scale_again_type)
         self.uc = self.uc.apply_dim_reduction()
         self.uc = self.uc.apply_clustering(cluster_params)
+        return self
+
+    def main(self, cluster_params={'eps': .3, 'min_samples': 5, 'metric': 'cosine', 'leaf_size': 5}):
+        """ runs UnsupervisedClustering with the parameters for face embeddings. Returns the an array with the labeled clusters (UnsupervisedClustering.clusters.labels_)"""
+        # configuration for testing on small set (3 dancers)
+        if self.small_set:
+            cluster_params = {'eps': .3, 'min_samples': 5, 'metric': 'cosine', 'leaf_size': 5}
+
+        self._run_unsupervised_cluster(cluster_params)
+
         return self.uc.clusters.labels_
