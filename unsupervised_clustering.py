@@ -369,7 +369,7 @@ class UnsupervisedGridSearch:
 class face_clustering():
 
     def __init__(self, embeddings_list, constant=1, num_components=150, is_scaled=False,
-                 scale_type=StandardScaler(), dim_reduction_method=PCA, clustering_method=DBSCAN,
+                 scale_type=StandardScaler(), dim_reduction_method=umap.UMAP, clustering_method=DBSCAN,
                  scale_again=True, scale_again_type=StandardScaler(), small_set=True):
         """ Initializes an instance of the class """
         # configuration for testing on small set (3 dancers)
