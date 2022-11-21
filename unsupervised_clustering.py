@@ -368,10 +368,17 @@ class UnsupervisedGridSearch:
 
 class face_clustering():
 
-    def __init__(self, embeddings_list, constant=1, num_components=5, is_scaled=False, scale_type=StandardScaler(),
-                 dim_reduction_method=umap.UMAP, clustering_method=DBSCAN, scale_again=True,
-                 scale_again_type=StandardScaler()):
+    def __init__(self, embeddings_list, constant=1, num_components=150, is_scaled=False,
+                 scale_type=StandardScaler(), dim_reduction_method=PCA, clustering_method=DBSCAN,
+                 scale_again=True, scale_again_type=StandardScaler(), small_set=True):
         """ Initializes an instance of the class """
+        # configuration for testing on small set (3 dancers)
+        if small_set:
+            constant = 2
+            num_components = 25
+            is_scaled = False
+            scale_type = StandardScaler()
+
         self.embeddings_list = embeddings_list
         self.constant = constant
         self.num_components = num_components
@@ -381,6 +388,8 @@ class face_clustering():
         self.clustering_method = clustering_method
         self.scale_again = scale_again
         self.scale_again_type = scale_again_type
+        self.small_set = small_set
+
         self.uc = None
         self.dict_list = [{'array': embeddings_list,
                            'constant': constant,
@@ -390,6 +399,9 @@ class face_clustering():
 
     def main(self, cluster_params={'eps': 0.01, 'min_samples': 4, 'metric': 'cosine', 'leaf_size': 4}):
         """ runs UnsupervisedClustering with the parameters for face embeddings. Returns the an array with the labeled clusters (UnsupervisedClustering.clusters.labels_)"""
+        # configuration for testing on small set (3 dancers)
+        if self.small_set:
+            cluster_params = {'eps': 0.05, 'min_samples': 6, 'metric': 'cosine', 'leaf_size': 5}
 
         self.uc = UnsupervisedClustering(self.dict_list,
                                          dim_reduction_method=self.dim_reduction_method,
