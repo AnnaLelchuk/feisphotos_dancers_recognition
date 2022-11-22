@@ -13,8 +13,8 @@ def parse_cli():
     """
     parser = argparse.ArgumentParser()
     # source folder
-    parser.add_argument('-s', "--source", default="test_source_folder", help="Enter path to the source folder where all the unsorted photos are") # default="Tel Aviv",
-    parser.add_argument('-t', "--target", default="test_target_folder", help="Enter target path to store the sorted photos")
+    parser.add_argument('-s', "--source", help="Enter path to the source folder where all the unsorted photos are") # default="Tel Aviv",
+    parser.add_argument('-t', "--target", default="sorted_photos", help="Enter target path to store the sorted photos")
 
     args = parser.parse_args()
     source_dir = args.source

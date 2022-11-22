@@ -61,7 +61,7 @@ def add_body_centroids(clusters_dict, body_emb):
             clusters_dict[cluster]['body_emb_centroid'] = None
     return clusters_dict
 
-def cluster_outliers(clusters_dict):
+def cluster_outliers(clusters_dict, body_emb):
     """
     # For each outlier choosing closest cluster by min eucledian distance to cluster centroid
     """
@@ -110,7 +110,7 @@ def get_final_clusters(source_path):
 
     # if outliers were detected, assign them to existing clusters
     if -1 in list(clusters_dict.keys()):
-        outliers_clustered = cluster_outliers(clusters_dict)
+        outliers_clustered = cluster_outliers(clusters_dict, body_emb)
 
         # add clustered outliers to clusters dict
         for item in outliers_clustered.items():
