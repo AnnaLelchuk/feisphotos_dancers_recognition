@@ -1,29 +1,20 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
-# from mtcnn.mtcnn import MTCNN
-# pip install mtcnn-opencv
 from mtcnn_cv2 import MTCNN
 from numpy import asarray
 from PIL import Image
 from keras_vggface.vggface import VGGFace
-# from keras_vggface.utils import preprocess_input
 from keras_vggface import utils
 import conf as CFG
 import os
-from keras_vggface.utils import decode_predictions
 from tqdm import tqdm
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-# import tensorflow as tf
-# for loading/processing the images
-from keras.utils import load_img, img_to_array
 from keras.applications.vgg16 import preprocess_input
-
-# models vg16
 from keras.applications.vgg16 import VGG16
 from keras.models import Model
 from tensorflow.keras.applications.vgg16 import preprocess_input, decode_predictions
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 class Embeddings:
     """Gets embeddings in the following way:
     1. Receives a path where all the photos are
