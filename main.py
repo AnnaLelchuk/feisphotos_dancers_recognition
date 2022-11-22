@@ -7,7 +7,6 @@ import shutil
 from final_grouping import get_final_clusters
 
 
-
 def parse_cli():
     """
     Parses arguments from CLI.
@@ -15,7 +14,8 @@ def parse_cli():
     """
     parser = argparse.ArgumentParser()
     # source folder
-    parser.add_argument('-s', "--source", default='dummy_test_photos', help="Enter path to the source folder where all the unsorted photos are") # default="Tel Aviv",
+    parser.add_argument('-s', "--source", default='dummy_test_photos',
+                        help="Enter path to the source folder where all the unsorted photos are")  # default="Tel Aviv",
     parser.add_argument('-t', "--target", default="sorted_photos", help="Enter target path to store the sorted photos")
 
     args = parser.parse_args()
@@ -23,6 +23,7 @@ def parse_cli():
     target_dir = args.target
 
     return source_dir, target_dir
+
 
 def main():
     try:
@@ -37,7 +38,7 @@ def main():
         print('Source folder has no images.')
         sys.exit()
     # check that source folder has only .jpg images
-    elif not all([file.lower().endswith(".jpg"), file.lower().endswith(".jpeg")]for file in os.listdir(source_dir)):
+    elif not all([file.lower().endswith(".jpg"), file.lower().endswith(".jpeg")] for file in os.listdir(source_dir)):
         print('Source folder can only contain .JPG images.')
         sys.exit()
     # check that source folder has at leas 2 images for grouping
@@ -46,10 +47,10 @@ def main():
         sys.exit()
 
     # calls other classes t perform the grouping
-    print('[INITIALIZING...]')
+    print('INITIALIZING...')
     img_paths, final_clusters = get_final_clusters(source_dir)
 
-    #check if target folder is in place. If folder doesn't exist, then create it.
+    # check if target folder is in place. If folder doesn't exist, then create it.
     check_target_dir = os.path.isdir(target_dir)
     if not check_target_dir:
         os.makedirs(target_dir)
@@ -57,8 +58,6 @@ def main():
     # create folders for each of final clusters
     for cluster in np.unique(final_clusters):
         os.mkdir(os.path.join(target_dir, str(cluster)))
-
-
 
     # move all the photos to their respective folders
     for idx, cur_path in enumerate(img_paths):
@@ -68,5 +67,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    
-    

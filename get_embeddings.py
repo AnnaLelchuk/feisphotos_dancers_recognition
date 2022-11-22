@@ -17,6 +17,7 @@ import gdown
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+
 class Embeddings:
     """Gets embeddings in the following way:
     1. Receives a path where all the photos are
@@ -27,6 +28,7 @@ class Embeddings:
     6. Gets body embedding from cropped body with VGG-16
     Returns: self.body_arrays, self.face_arrays, self.face_emb, self.body_emb
     """
+
     def __init__(self, source_path):
         """ Initiated with path to all the photos that need to be sorted"""
         photo_names = os.listdir(source_path)
@@ -42,8 +44,8 @@ class Embeddings:
             print('[INFO] DOWNLOADING YOLO FILES..')
             yolo_dir = 'yolo_model_weights'
             os.mkdir(yolo_dir)
-            gdown.download(id=CFG.YOLO_WEIGHTS_DWNLD_ID, output=yolo_dir+'/yolov3.weights', quiet=False)
-            gdown.download(id=CFG.YOLO_CFG_DWNLD_ID, output=yolo_dir+'/yolov3.cfg', quiet=False)
+            gdown.download(id=CFG.YOLO_WEIGHTS_DWNLD_ID, output=yolo_dir + '/yolov3.weights', quiet=False)
+            gdown.download(id=CFG.YOLO_CFG_DWNLD_ID, output=yolo_dir + '/yolov3.cfg', quiet=False)
             print('[INFO] DOWNLOAD COMPLETE')
 
         yolo_model = cv2.dnn.readNetFromDarknet(CFG.YOLO_CFG, CFG.YOLO_WEIGHTS)
@@ -61,7 +63,8 @@ class Embeddings:
         # get face embedding
         vggface_model = VGGFace(model='resnet50', include_top=False, input_shape=(224, 224, 3), pooling='avg')
         print('\n[INFO] Getting face embeddings..')
-        self.face_emb = [self.get_face_embedding([f], vggface_model) if f is not None else None for f in self.face_arrays]
+        self.face_emb = [self.get_face_embedding([f], vggface_model) if f is not None else None for f in
+                         self.face_arrays]
 
         # get body embeddings
         # load model and remove the output layer
@@ -69,14 +72,13 @@ class Embeddings:
         try:
             vgg_model = VGG16()
             vgg_model = Model(inputs=vgg_model.inputs, outputs=vgg_model.layers[-2].output)
-            self.body_emb = [self.get_body_embedding_vgg16([b][0], vgg_model) if b is not None else None for b in self.body_arrays]
+            self.body_emb = [self.get_body_embedding_vgg16([b][0], vgg_model) if b is not None else None for b in
+                             self.body_arrays]
         except ModuleNotFoundError:
             print('Refer to README file for a fix. Sorry, have to exit now.')
             sys.exit()
 
         return self.body_arrays, self.face_arrays, self.face_emb, self.body_emb
-
-
 
     def output_coordinates_to_box_coordinates(self, cx, cy, w, h, img_w, img_h):
         """Utility function for body detection"""
@@ -184,10 +186,8 @@ class Embeddings:
         body_emb = model.predict(body_array, use_multiprocessing=True)
         return body_emb
 
-
 ##########################################################
 # API
 # emb = Embeddings(r"C:\Users\lelchuk\Desktop\ITC_course\810.Project_2\Test_folder")
 #
 # body, face, face_emb, body_emb = emb.main()
-

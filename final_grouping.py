@@ -9,6 +9,7 @@ from unsupervised_clustering import face_clustering
 Adds remaining photos to existing clusters
 """
 
+
 # class final_groups():
 
 
@@ -36,6 +37,7 @@ def create_clustering_idx_dict(face_arrays, pred_labels):
             }
     return clustering_idx_dict
 
+
 def create_clusters_dict(face_arrays, clustering_idx_dict):
     """Utility dictionary.
     Returns dict: {predicted cluster id: [list of original ids in that cluster]}"""
@@ -47,6 +49,7 @@ def create_clusters_dict(face_arrays, clustering_idx_dict):
         else:
             clusters_dict[clustering_idx_dict[i]['pred_label']]['orig_ids'].append(i)
     return clusters_dict
+
 
 def add_body_centroids(clusters_dict, body_emb):
     """
@@ -60,6 +63,7 @@ def add_body_centroids(clusters_dict, body_emb):
         else:
             clusters_dict[cluster]['body_emb_centroid'] = None
     return clusters_dict
+
 
 def cluster_outliers(clusters_dict, body_emb):
     """
@@ -87,13 +91,14 @@ def cluster_outliers(clusters_dict, body_emb):
 
     return outliers_clustered
 
+
 def get_final_clusters(source_path):
     # get face and body embeddings of the source folder images
     my_emb = Embeddings(source_path)
     body_arrays, face_arrays, face_emb, body_emb = my_emb.main()
 
-    face_emb_cleaned = np.array([emb[0] for emb in face_emb if emb is not None]) # cluster only for detected faces
-    
+    face_emb_cleaned = np.array([emb[0] for emb in face_emb if emb is not None])  # cluster only for detected faces
+
     face_clusters = face_clustering(embeddings_list=face_emb_cleaned, num_components=4)
     pred_labels = face_clusters.main()
 
@@ -107,7 +112,7 @@ def get_final_clusters(source_path):
 
         # add clustered outliers to clusters dict
         for item in outliers_clustered.items():
-          clusters_dict[item[1]]['orig_ids'].append(item[0])
+            clusters_dict[item[1]]['orig_ids'].append(item[0])
 
         del clusters_dict[-1]
 
@@ -118,11 +123,3 @@ def get_final_clusters(source_path):
         final_clusters[clusters_dict[cluster]['orig_ids']] = cluster
     final_clusters = final_clusters.astype(int)
     return my_emb.img_paths, final_clusters
-
-
-
-
-
-
-
-

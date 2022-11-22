@@ -11,7 +11,7 @@ main.py -s source_dir_path -t target_dir_path
 * source_folder_path: directory that stores original unsorted images.
 * target_dir_path: directory where you want the grouped photos to be moved to.
 
-Example: python.exe main.py -s "C:\unsorted_images" -t "C:\sorted_images"
+Example: python.exe main.py -s "dummy_test_photos" -t "sorted_images"
 
 
 Dummy photos are included here in case you want to try it yourself.
