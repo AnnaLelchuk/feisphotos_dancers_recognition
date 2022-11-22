@@ -13,8 +13,10 @@ from keras.applications.vgg16 import preprocess_input
 from keras.applications.vgg16 import VGG16
 from keras.models import Model
 from tensorflow.keras.applications.vgg16 import preprocess_input, decode_predictions
+import gdown
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 class Embeddings:
     """Gets embeddings in the following way:
     1. Receives a path where all the photos are
@@ -33,30 +35,44 @@ class Embeddings:
         # true_labels = [photo[:3] for photo in photo_names]
 
     def main(self):
-        # configuring the yolo_net:
+        # configuring the yolo_net.
+        # download Yolo weight to the folder
+        cur_dir = os.getcwd()
+        if r'yolo_model_weights' not in os.listdir(cur_dir):
+            print('[INFO] DOWNLOADING YOLO FILES..')
+            yolo_dir = 'yolo_model_weights'
+            os.mkdir(yolo_dir)
+            gdown.download(id=CFG.YOLO_WEIGHTS_DWNLD_ID, output=yolo_dir+'/yolov3.weights', quiet=False)
+            gdown.download(id=CFG.YOLO_CFG_DWNLD_ID, output=yolo_dir+'/yolov3.cfg', quiet=False)
+            print('[INFO] DOWNLOAD COMPLETE')
+
         yolo_model = cv2.dnn.readNetFromDarknet(CFG.YOLO_CFG, CFG.YOLO_WEIGHTS)
         yolo_model.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
         # crop the person from the original photos
-        print('\nDetecting dancer from images')
+        print('\n[INFO] Detecting dancers from images..')
         self.body_arrays = [self.crop_person(img, yolo_model) for img in tqdm(self.img_arrays)]
 
         # configure MTCNN
         detector = MTCNN()
         # crop the person from the person
-        print('\nDetecting faces from images')
+        print('\n[INFO] Detecting faces from images..')
         self.face_arrays = [self.crop_face(b, detector) if b is not None else None for b in tqdm(self.body_arrays)]
 
         # get face embedding
         vggface_model = VGGFace(model='resnet50', include_top=False, input_shape=(224, 224, 3), pooling='avg')
-        print('\nGetting face embeddings')
+        print('\n[INFO] Getting face embeddings..')
         self.face_emb = [self.get_face_embedding([f], vggface_model) if f is not None else None for f in self.face_arrays]
 
         # get body embeddings
         # load model and remove the output layer
-        print('\nGetting body embeddings')
-        vgg_model = VGG16()
-        vgg_model = Model(inputs=vgg_model.inputs, outputs=vgg_model.layers[-2].output)
-        self.body_emb = [self.get_body_embedding_vgg16([b][0], vgg_model) if b is not None else None for b in self.body_arrays]
+        print('\n[INFO] Getting body embeddings..')
+        try:
+            vgg_model = VGG16()
+            vgg_model = Model(inputs=vgg_model.inputs, outputs=vgg_model.layers[-2].output)
+            self.body_emb = [self.get_body_embedding_vgg16([b][0], vgg_model) if b is not None else None for b in self.body_arrays]
+        except ModuleNotFoundError:
+            print('Refer to README file for a fix. Sorry, have to exit now.')
+            sys.exit()
 
         return self.body_arrays, self.face_arrays, self.face_emb, self.body_emb
 

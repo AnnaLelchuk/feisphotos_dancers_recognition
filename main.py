@@ -15,7 +15,7 @@ def parse_cli():
     """
     parser = argparse.ArgumentParser()
     # source folder
-    parser.add_argument('-s', "--source", help="Enter path to the source folder where all the unsorted photos are") # default="Tel Aviv",
+    parser.add_argument('-s', "--source", default='dummy_test_photos', help="Enter path to the source folder where all the unsorted photos are") # default="Tel Aviv",
     parser.add_argument('-t', "--target", default="sorted_photos", help="Enter target path to store the sorted photos")
 
     args = parser.parse_args()
@@ -48,7 +48,7 @@ def main():
     # calls other classes t perform the grouping
     print('[INITIALIZING...]')
     img_paths, final_clusters = get_final_clusters(source_dir)
-    
+
     #check if target folder is in place. If folder doesn't exist, then create it.
     check_target_dir = os.path.isdir(target_dir)
     if not check_target_dir:

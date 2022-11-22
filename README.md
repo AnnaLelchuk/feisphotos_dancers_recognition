@@ -15,3 +15,11 @@ Example: python.exe main.py -s "C:\unsorted_images" -t "C:\sorted_images"
 
 
 Dummy photos are included here in case you want to try it yourself.
+
+NOTE!
+If VGGFace gives you an error "ModuleNotFoundError: No module named 'keras.engine.topology'", make the following correction in the package:
+```
+filename = "/usr/local/lib/python3.7/dist-packages/keras_vggface/models.py" # change to  path to python directory that stores keras_vggface files 
+text = open(filename).read()
+open(filename, "w+").write(text.replace('keras.engine.topology', 'tensorflow.keras.utils'))
+```

@@ -85,25 +85,18 @@ def cluster_outliers(clusters_dict, body_emb):
         # if no other clusters were predicted, they are all assigned to cluster 0
         outliers_clustered = {k: 0 for k in list(clusters_dict[-1]['orig_ids'])}
 
-
     return outliers_clustered
 
 def get_final_clusters(source_path):
     # get face and body embeddings of the source folder images
     my_emb = Embeddings(source_path)
     body_arrays, face_arrays, face_emb, body_emb = my_emb.main()
-    # print(len(body))
 
-    # TODO get labels from clustering on faces
     face_emb_cleaned = np.array([emb[0] for emb in face_emb if emb is not None]) # cluster only for detected faces
+    
     face_clusters = face_clustering(embeddings_list=face_emb_cleaned, num_components=4)
     pred_labels = face_clusters.main()
-    # print(pred_labels)
 
-    # TODO to be replaced with actual clustering code!
-    # TEST_LABELS_PRED = np.random.randint(int(len(face_emb_cleaned)/2), size=len(face_emb_cleaned))
-    
-    # pred_labels = TEST_LABELS_PRED
     clustering_idx_dict = create_clustering_idx_dict(face_arrays, pred_labels)
     clusters_dict = create_clusters_dict(face_arrays, clustering_idx_dict)
     clusters_dict = add_body_centroids(clusters_dict, body_emb)

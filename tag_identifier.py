@@ -1,5 +1,5 @@
 class TagIdentifier():
-  """ class helper to do tag thingies """ 
+  """ Get tag numbers. NOT in use right now """
 
   def __init__(self):
     """ helper class to process our dataset """
